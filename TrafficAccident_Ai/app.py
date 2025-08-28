@@ -9,12 +9,14 @@ import os
 import json
 from collections import Counter
 
-app = Flask(__name__, static_folder='static', template_folder='static', static_url_path='')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(__name__, static_folder=os.path.join(BASE_DIR, 'static'), template_folder=os.path.join(BASE_DIR, 'static'), static_url_path='')
 socketio = SocketIO(app)
 
 # Load video and model
-video_path = os.path.join('static/processed', 'traffic_video_processed.mp4')
-model = YOLO("yolo11n.pt")
+video_path = os.path.join(BASE_DIR, 'static/processed', 'traffic_video_processed.mp4')
+model = YOLO(os.path.join(BASE_DIR, "yolo11n.pt"))
 
 latest_detections = []
 detection_running = False
@@ -25,15 +27,15 @@ lane_occupancy = {f'lane{i}': 'Clear' for i in range(1, 5)}
 
 # Function to initialize processing on Flask start
 def initialize_video_processing():
-    originals_path = 'static/originals'
-    processed_path = 'static/processed'
+    originals_path = os.path.join(BASE_DIR, 'static/originals')
+    processed_path = os.path.join(BASE_DIR, 'static/processed')
 
-    # Check if paths exist
+    # Check if paths exist, and create them if they don't
     if not os.path.exists(originals_path):
-        print(f"Error: Originals path '{originals_path}' does not exist.")
-        return
+        print(f"Originals path '{originals_path}' not found. Creating directory.")
+        os.makedirs(originals_path)
     if not os.path.exists(processed_path):
-        print(f"Error: Processed path '{processed_path}' does not exist.")
+        print(f"Processed path '{processed_path}' not found. Creating directory.")
         os.makedirs(processed_path)
 
     # Get list of .mp4 files in originals and processed folders
@@ -177,7 +179,7 @@ def upload_video():
     
     # 파일 이름 설정 및 저장 경로 지정
     filename = file.filename
-    original_path = os.path.join('static/originals', filename)
+    original_path = os.path.join(BASE_DIR, 'static/originals', filename)
     
     try:
         # 파일을 static/originals 폴더에 저장
@@ -185,16 +187,16 @@ def upload_video():
         
         # 분석 및 처리 경로 설정
         base_name = os.path.splitext(filename)[0]
-        processed_video_path = os.path.join('static/processed', f"{base_name}_processed.mp4")
-        label_json_path = os.path.join('static/processed', f"{base_name}_processed.json")
+        processed_video_path = os.path.join(BASE_DIR, 'static/processed', f"{base_name}_processed.mp4")
+        label_json_path = os.path.join(BASE_DIR, 'static/processed', f"{base_name}_processed.json")
         
         # 분석 및 처리 함수 호출
         process_and_generate_videos(original_path, processed_video_path, label_json_path)
         
         return jsonify({
             "message": "File uploaded and processing completed successfully",
-            "processed_video": f"/static/processed/{base_name}_processed.mp4",
-            "label_data": f"/static/processed/{base_name}_processed.json"
+            "processed_video": url_for('static', filename=f'processed/{base_name}_processed.mp4'),
+            "label_data": url_for('static', filename=f'processed/{base_name}_processed.json')
         }), 200
     except Exception as e:
         return jsonify({"message": f"Failed to upload and process file: {e}"}), 500
@@ -203,9 +205,9 @@ def upload_video():
 @app.route('/get_video_list')
 def get_video_list():
     try:
-        video_files = os.listdir('static/processed')
+        processed_path = os.path.join(BASE_DIR, 'static/processed')
+        video_files = os.listdir(processed_path)
         video_files = [f for f in video_files if f.endswith('.mp4')]
-        return jsonify({"videos": video_files}), 200
         # URL 생성
         video_urls = [url_for('static', filename=f'processed/{f}') for f in video_files]
         return jsonify({"videos": video_urls}), 200
@@ -214,7 +216,7 @@ def get_video_list():
 
 @app.route('/get_label_data/<video_name>')
 def get_label_data(video_name):
-    label_path = os.path.join(f'static/processed/{video_name}.json')
+    label_path = os.path.join(BASE_DIR, 'static/processed', f'{video_name}.json')
     print(label_path)
     if not os.path.exists(label_path):
         return jsonify({"message": "Label file not found"}), 404
@@ -227,8 +229,7 @@ def get_label_data(video_name):
         return jsonify({"message": f"Error reading label file: {e}"}), 500
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
-    
-initialize_video_processing()
+    initialize_video_processing()
+    socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)
 
 

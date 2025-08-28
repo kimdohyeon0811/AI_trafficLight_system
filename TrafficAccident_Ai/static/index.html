@@ -478,28 +478,31 @@
                         videoListUl.innerHTML = '';
 
                         // 파일 목록 동적 추가
-                        data.videos.forEach(video => {
+                        data.videos.forEach(videoUrl => {
+                            const videoFileName = videoUrl.split('/').pop();
+
                             const item = document.createElement('li');
-                            item.textContent = video;
-                            item.setAttribute('data-video', video);
+                            item.textContent = videoFileName; // Display clean file name
+                            item.setAttribute('data-video-url', videoUrl);
+                            item.setAttribute('data-video-filename', videoFileName);
+
                             // 목록에서 비디오 클릭 시 동작
                             item.addEventListener('click', function () {
-                                const videoFile = this.getAttribute('data-video');
-                                const video = document.getElementById('traffic-video');
-                                video.src = "{{ url_for('static', filename='processed/') }}" + videoFile;
-                                video.load();
-
-                                //document.querySelector('.video-name').textContent = videoFile;
-
-
-                                const jsonFile = videoFile.replace('.mp4', '.json');
-                                console.log(jsonFile)
-                                loadGraph("{{ url_for('static', filename='processed/') }}" + jsonFile);
-                                // Fetch and update label data
-                                const baseName = videoFile.replace('.mp4', ''); // Remove file extension
-                                fetchLabelData(baseName);
-
+                                const videoSrc = this.getAttribute('data-video-url');
+                                const clickedVideoFileName = this.getAttribute('data-video-filename');
                                 
+                                const videoPlayer = document.getElementById('traffic-video');
+                                videoPlayer.src = videoSrc;
+                                videoPlayer.load();
+
+                                // For fetching label data via the Flask route
+                                const baseNameForLabel = clickedVideoFileName.replace('.mp4', '');
+                                fetchLabelData(baseNameForLabel);
+
+                                // For loading the graph, which likely fetches the JSON file directly
+                                const jsonUrl = videoSrc.replace('.mp4', '.json');
+                                loadGraph(jsonUrl);
+
                                 // Hide the video list dropdown
                                 document.getElementById('video-list').classList.remove('show');
                             });
